@@ -27,10 +27,16 @@ cargo run
     - `mcp` > `Command (stdio)`
     - Paste the path to mcp.exe (`C:\\Your-path\\MCP-server\\mcp\\target\\debug\\mcp.exe`)
 
+## Parameters
+
+- `--auto-approve` parameter : add this in the `mcp.json` > `args` to allow auto approval *(knowing that it is overruled by your vscode copilot extension parameter, thus it allow you to only allow it once)*.
+
 ## Project Structure
 
-- `src/main.rs`: Main entry point of the MCP server.
-- `Cargo.toml`: Project configuration and Rust dependencies.
+- `mcp/`: Contains the Rust MCP server code.
+  - `src/main.rs`: Main entry point of the MCP server.
+  - `Cargo.toml`: Project configuration and Rust dependencies.
+  - `Makefile`: Automation script with tasks to stop, build, and restart the server easily.
 
 ## Development
 

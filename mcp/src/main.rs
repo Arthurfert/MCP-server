@@ -26,7 +26,7 @@ fn respond(id: &Value, result: Value) {
     handle.flush().unwrap();
 }
 
-fn handle_tool_call(params: Value) -> Value {
+fn handle_tool_call(params: Value, require_confirmation: bool) -> Value {
     let name = params["name"].as_str().unwrap_or("");
     let args = params["arguments"].as_object();
 
@@ -35,23 +35,25 @@ fn handle_tool_call(params: Value) -> Value {
         None => "Aucun argument".to_string(),
     };
 
-    let description = format!(
-        "L'IA souhaite exécuter l'outil : '{}'\n\nArguments :\n{}",
-        name, json_args_str
-    );
+    if require_confirmation {
+        let description = format!(
+            "L'IA souhaite exécuter l'outil : '{}'\n\nArguments :\n{}",
+            name, json_args_str
+        );
 
-    let confirmed = rfd::MessageDialog::new()
-        .set_level(rfd::MessageLevel::Warning)
-        .set_title("Exécution d'une commande système")
-        .set_description(&description)
-        .set_buttons(rfd::MessageButtons::YesNo)
-        .show();
+        let confirmed = rfd::MessageDialog::new()
+            .set_level(rfd::MessageLevel::Warning)
+            .set_title("Exécution d'une commande système")
+            .set_description(&description)
+            .set_buttons(rfd::MessageButtons::YesNo)
+            .show();
 
-    if confirmed != rfd::MessageDialogResult::Yes {
-        return json!({
-            "isError": true,
-            "content": [{ "type": "text", "text": "Action annulée par l'utilisateur." }]
-        });
+        if confirmed != rfd::MessageDialogResult::Yes {
+            return json!({
+                "isError": true,
+                "content": [{ "type": "text", "text": "Action annulée par l'utilisateur." }]
+            });
+        }
     }
 
     match name {
@@ -110,6 +112,11 @@ fn handle_tool_call(params: Value) -> Value {
 }
 
 fn main() -> anyhow::Result<()> {
+    // Lecture des arguments en ligne de commande
+    let args: Vec<String> = std::env::args().collect();
+    // La confirmation est requise par défaut, sauf si "--auto-approve" est passé en argument
+    let require_confirmation = !args.contains(&"--auto-approve".to_string());
+
     let stdin = io::stdin();
     
     // Boucle principale MCP sur Stdin
@@ -135,9 +142,7 @@ fn main() -> anyhow::Result<()> {
                         }));
                     }
                 }
-                "notifications/initialized" => {
-                    // Le client est prêt.
-                }
+                "notifications/initialized" => {}
                 "tools/list" => {
                     if let Some(id) = req.id {
                         respond(&id, json!({
@@ -176,7 +181,7 @@ fn main() -> anyhow::Result<()> {
                 }
                 "tools/call" => {
                     if let (Some(id), Some(params)) = (req.id, req.params) {
-                        let result = handle_tool_call(params);
+                        let result = handle_tool_call(params, require_confirmation);
                         respond(&id, result);
                     }
                 }
