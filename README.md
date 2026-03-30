@@ -29,14 +29,21 @@ cargo run
 
 ## Parameters
 
-- `--auto-approve` parameter : add this in the `mcp.json` > `args` to allow auto approval *(knowing that it is overruled by your vscode copilot extension parameter, thus it allow you to only allow it once)*.
+- `--auto-approve` parameter : add this in the `mcp.json` > `args` to allow auto approval. **Be careful as it can lead to security issues**. *The vscode copilot extension overrule this parameter **just once per command type and by prompt***
 
 ## Project Structure
 
-- `mcp/`: Contains the Rust MCP server code.
-  - `src/main.rs`: Main entry point of the MCP server.
-  - `Cargo.toml`: Project configuration and Rust dependencies.
-  - `Makefile`: Automation script with tasks to stop, build, and restart the server easily.
+```text
+MCP-server/
+├── LICENSE
+├── README.md
+└── mcp/
+    ├── Cargo.lock
+    ├── Cargo.toml
+    ├── Makefile
+    └── src/
+        └── main.rs
+```
 
 ## Development
 

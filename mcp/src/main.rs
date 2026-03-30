@@ -107,6 +107,41 @@ fn handle_tool_call(params: Value, require_confirmation: bool) -> Value {
                 json!({ "isError": true, "content": [{ "type": "text", "text": "Arguments manquants" }] })
             }
         }
+        "run_command" => {
+            if let Some(a) = args {
+                let cmd_str = a.get("command").and_then(|c| c.as_str()).unwrap_or("");
+                let cwd = a.get("cwd").and_then(|c| c.as_str()).unwrap_or("C:\\Users\\ferta\\Documents\\GitHub\\MCP-server");
+
+                // Comme nous sommes sous Windows, exécuter les commandes via PowerShell est le plus robuste (supporte 'ls', etc.)
+                let mut cmd = Command::new("powershell");
+                cmd.arg("-Command").arg(cmd_str).current_dir(cwd);
+
+                match cmd.output() {
+                    Ok(output) => {
+                        let mut result_str = String::from_utf8_lossy(&output.stdout).to_string();
+                        let stderr_str = String::from_utf8_lossy(&output.stderr).to_string();
+
+                        let info = format!("Dossier: {}\nCommande: {}", cwd, cmd_str);
+
+                        if !stderr_str.is_empty() {
+                            result_str = format!("{}\n{}\nErreur/Warn:\n{}", info, result_str, stderr_str);
+                        } else {
+                            result_str = format!("{}\n----\n{}", info, result_str);
+                        }
+                        if result_str.trim().is_empty() {
+                            result_str = "(Sortie vide)".to_string();
+                        }
+
+                        json!({ "content": [{ "type": "text", "text": result_str }] })
+                    },
+                    Err(e) => {
+                        json!({ "isError": true, "content": [{ "type": "text", "text": format!("Erreur d'exécution: {}", e) }] })
+                    }
+                }
+            } else {
+                json!({ "isError": true, "content": [{ "type": "text", "text": "Arguments manquants" }] })
+            }
+        }
         _ => json!({ "isError": true, "content": [{ "type": "text", "text": "Outil inconnu" }] })
     }
 }
@@ -172,6 +207,18 @@ fn main() -> anyhow::Result<()> {
                                         "required": ["path"],
                                         "properties": {
                                             "path": { "type": "string", "description": "Chemin absolu ou relatif du fichier à lire" }
+                                        }
+                                    }
+                                },
+                                {
+                                    "name": "run_command",
+                                    "description": "Exécute une commande PowerShell dans un terminal (ex: ls, dir). Attention: la commande 'cd' ne sauvegarde pas son état pour l'appel suivant (utilisez l'argument 'cwd' pour définir le dossier).",
+                                    "inputSchema": {
+                                        "type": "object",
+                                        "required": ["command"],
+                                        "properties": {
+                                            "command": { "type": "string", "description": "La commande à exécuter" },
+                                            "cwd": { "type": "string", "description": "Le dossier cible depuis lequel lancer la commande" }
                                         }
                                     }
                                 }
