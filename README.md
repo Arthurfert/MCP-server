@@ -27,9 +27,19 @@ cargo run
     - `mcp` > `Command (stdio)`
     - Paste the path to mcp.exe (`C:\\Your-path\\MCP-server\\mcp\\target\\debug\\mcp.exe`)
 
+## MCP Tools
+
+The server currently exposes the following tools to the LLM agent:
+
+- **`git_status`**: Runs `git status` to view repository modifications.
+- **`read_file`**: Reads and returns the content of a file (absolute or relative path).
+- **`replace_text_in_file`**: Searches for an exact block of text in a file and replaces it. Useful for modifying or removing code snippets without rewriting the entire file.
+- **`run_command`**: Executes a PowerShell command in a terminal (e.g., `ls`, `dir`).
+- **`update_file`**: Completely writes or overwrites an existing file with new content.
+
 ## Parameters
 
-- `--auto-approve` parameter : add this in the `mcp.json` > `args` to allow auto approval. **Be careful as it can lead to security issues**. *The vscode copilot extension overrule this parameter **just once per command type and by prompt***
+- `--auto-approve` parameter : add this in the `mcp.json` > `args` to allow auto approval. **Be careful as it can lead to security issues**. *The vscode copilot extension overrule this parameter **just once per command type and by prompt***.
 
 ## Project Structure
 

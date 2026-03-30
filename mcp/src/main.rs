@@ -18,7 +18,6 @@ fn respond(id: &Value, result: Value) {
         "id": id,
         "result": result
     });
-    // L'envoi des messages doit strictement s'effectuer sur stdout.
     let out = io::stdout();
     let mut handle = out.lock();
     serde_json::to_writer(&mut handle, &response).unwrap();
@@ -58,7 +57,6 @@ fn handle_tool_call(params: Value, require_confirmation: bool) -> Value {
 
     match name {
         "git_status" => {
-            // Par défaut, s'il n'y a pas de paramètre de chemin, on utilise le chemin en dur du dépôt
             let custom_path = args.and_then(|a| a.get("path")).and_then(|p| p.as_str())
                                .unwrap_or("C:\\Users\\ferta\\Documents\\GitHub\\MCP-server");
             
@@ -66,10 +64,8 @@ fn handle_tool_call(params: Value, require_confirmation: bool) -> Value {
             cmd.arg("status").current_dir(custom_path);
             
             let output = cmd.output().unwrap();
-            
             let mut result_str = String::from_utf8_lossy(&output.stdout).to_string();
             let stderr_str = String::from_utf8_lossy(&output.stderr).to_string();
-            
             let info = format!("Dossier courant d'exécution: {}", custom_path);
             
             if !stderr_str.is_empty() {
@@ -80,7 +76,6 @@ fn handle_tool_call(params: Value, require_confirmation: bool) -> Value {
             if result_str.trim().is_empty() {
                 result_str = "(Sortie vide)".to_string();
             }
-            
             json!({ "content": [{ "type": "text", "text": result_str }] })
         }
         "update_file" => {
@@ -90,7 +85,7 @@ fn handle_tool_call(params: Value, require_confirmation: bool) -> Value {
                 if let Err(e) = std::fs::write(path, content) {
                      json!({ "isError": true, "content": [{ "type": "text", "text": format!("Erreur d'écriture : {}", e) }] })
                 } else {
-                     json!({ "content": [{ "type": "text", "text": format!("Fichier {} modifié.", path) }] })
+                     json!({ "content": [{ "type": "text", "text": format!("Fichier {} modifié en entier.", path) }] })
                 }
             } else {
                 json!({ "isError": true, "content": [{ "type": "text", "text": "Arguments manquants" }] })
@@ -107,12 +102,36 @@ fn handle_tool_call(params: Value, require_confirmation: bool) -> Value {
                 json!({ "isError": true, "content": [{ "type": "text", "text": "Arguments manquants" }] })
             }
         }
+        "replace_text_in_file" => {
+            if let Some(a) = args {
+                let path = a.get("path").and_then(|p| p.as_str()).unwrap_or("");
+                let old_text = a.get("old_text").and_then(|t| t.as_str()).unwrap_or("");
+                let new_text = a.get("new_text").and_then(|t| t.as_str()).unwrap_or("");
+
+                match std::fs::read_to_string(path) {
+                    Ok(content) => {
+                        if content.contains(old_text) {
+                            let new_content = content.replace(old_text, new_text);
+                            if let Err(e) = std::fs::write(path, new_content) {
+                                json!({ "isError": true, "content": [{ "type": "text", "text": format!("Erreur d'écriture : {}", e) }] })
+                            } else {
+                                json!({ "content": [{ "type": "text", "text": format!("Texte remplacé avec succès dans le fichier {}.", path) }] })
+                            }
+                        } else {
+                            json!({ "isError": true, "content": [{ "type": "text", "text": "Le texte spécifié (old_text) n'a pas été trouvé dans le fichier, impossible de le remplacer." }] })
+                        }
+                    },
+                    Err(e) => json!({ "isError": true, "content": [{ "type": "text", "text": format!("Erreur de lecture du fichier {} : {}", path, e) }] })
+                }
+            } else {
+                json!({ "isError": true, "content": [{ "type": "text", "text": "Arguments manquants" }] })
+            }
+        }
         "run_command" => {
             if let Some(a) = args {
                 let cmd_str = a.get("command").and_then(|c| c.as_str()).unwrap_or("");
                 let cwd = a.get("cwd").and_then(|c| c.as_str()).unwrap_or("C:\\Users\\ferta\\Documents\\GitHub\\MCP-server");
 
-                // Comme nous sommes sous Windows, exécuter les commandes via PowerShell est le plus robuste (supporte 'ls', etc.)
                 let mut cmd = Command::new("powershell");
                 cmd.arg("-Command").arg(cmd_str).current_dir(cwd);
 
@@ -131,7 +150,6 @@ fn handle_tool_call(params: Value, require_confirmation: bool) -> Value {
                         if result_str.trim().is_empty() {
                             result_str = "(Sortie vide)".to_string();
                         }
-
                         json!({ "content": [{ "type": "text", "text": result_str }] })
                     },
                     Err(e) => {
@@ -147,18 +165,15 @@ fn handle_tool_call(params: Value, require_confirmation: bool) -> Value {
 }
 
 fn main() -> anyhow::Result<()> {
-    // Lecture des arguments en ligne de commande
     let args: Vec<String> = std::env::args().collect();
-    // La confirmation est requise par défaut, sauf si "--auto-approve" est passé en argument
     let require_confirmation = !args.contains(&"--auto-approve".to_string());
 
     let stdin = io::stdin();
     
-    // Boucle principale MCP sur Stdin
     for line in stdin.lock().lines() {
         let line = match line {
             Ok(l) => l,
-            Err(_) => break, // Arrêt EOF
+            Err(_) => break,
         };
         
         if line.trim().is_empty() { continue; }
@@ -189,13 +204,13 @@ fn main() -> anyhow::Result<()> {
                                 },
                                 {
                                     "name": "update_file",
-                                    "description": "Écrit ou remplace le contenu d'un fichier.",
+                                    "description": "Écrit ou remplace ENTIÈREMENT le contenu d'un fichier existant.",
                                     "inputSchema": {
                                         "type": "object",
                                         "required": ["path", "content"],
                                         "properties": {
                                             "path": { "type": "string", "description": "Chemin du fichier" },
-                                            "content": { "type": "string", "description": "Nouveau contenu complet" }
+                                            "content": { "type": "string", "description": "Nouveau contenu complet du fichier" }
                                         }
                                     }
                                 },
@@ -207,6 +222,19 @@ fn main() -> anyhow::Result<()> {
                                         "required": ["path"],
                                         "properties": {
                                             "path": { "type": "string", "description": "Chemin absolu ou relatif du fichier à lire" }
+                                        }
+                                    }
+                                },
+                                {
+                                    "name": "replace_text_in_file",
+                                    "description": "Cherche un bloc de texte précis dans un fichier et le remplace par un nouveau. Très utile pour modifier ou supprimer une portion de code (si new_text est vide) sans réécrire tout le fichier.",
+                                    "inputSchema": {
+                                        "type": "object",
+                                        "required": ["path", "old_text", "new_text"],
+                                        "properties": {
+                                            "path": { "type": "string", "description": "Chemin du fichier" },
+                                            "old_text": { "type": "string", "description": "Le texte exact à remplacer" },
+                                            "new_text": { "type": "string", "description": "Le nouveau texte. Peut être vide '' pour une suppression." }
                                         }
                                     }
                                 },
