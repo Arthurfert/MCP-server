@@ -1,0 +1,3 @@
+# Rust compiled files
+target/
+*.lock
