@@ -81,12 +81,26 @@ fn handle_tool_call(params: Value) -> Value {
             
             json!({ "content": [{ "type": "text", "text": result_str }] })
         }
-        "write_file" => {
+        "update_file" => {
             if let Some(a) = args {
-                let path = a["path"].as_str().unwrap_or("");
-                let content = a["content"].as_str().unwrap_or("");
-                std::fs::write(path, content).unwrap();
-                json!({ "content": [{ "type": "text", "text": format!("Fichier {} modifié.", path) }] })
+                let path = a.get("path").and_then(|p| p.as_str()).unwrap_or("");
+                let content = a.get("content").and_then(|c| c.as_str()).unwrap_or("");
+                if let Err(e) = std::fs::write(path, content) {
+                     json!({ "isError": true, "content": [{ "type": "text", "text": format!("Erreur d'écriture : {}", e) }] })
+                } else {
+                     json!({ "content": [{ "type": "text", "text": format!("Fichier {} modifié.", path) }] })
+                }
+            } else {
+                json!({ "isError": true, "content": [{ "type": "text", "text": "Arguments manquants" }] })
+            }
+        }
+        "read_file" => {
+            if let Some(a) = args {
+                let path = a.get("path").and_then(|p| p.as_str()).unwrap_or("");
+                match std::fs::read_to_string(path) {
+                    Ok(content) => json!({ "content": [{ "type": "text", "text": content }] }),
+                    Err(e) => json!({ "isError": true, "content": [{ "type": "text", "text": format!("Erreur de lecture du fichier {} : {}", path, e) }] })
+                }
             } else {
                 json!({ "isError": true, "content": [{ "type": "text", "text": "Arguments manquants" }] })
             }
@@ -134,7 +148,7 @@ fn main() -> anyhow::Result<()> {
                                     "inputSchema": { "type": "object", "properties": {} }
                                 },
                                 {
-                                    "name": "write_file",
+                                    "name": "update_file",
                                     "description": "Écrit ou remplace le contenu d'un fichier.",
                                     "inputSchema": {
                                         "type": "object",
@@ -142,6 +156,17 @@ fn main() -> anyhow::Result<()> {
                                         "properties": {
                                             "path": { "type": "string", "description": "Chemin du fichier" },
                                             "content": { "type": "string", "description": "Nouveau contenu complet" }
+                                        }
+                                    }
+                                },
+                                {
+                                    "name": "read_file",
+                                    "description": "Lit le contenu d'un fichier et le renvoie.",
+                                    "inputSchema": {
+                                        "type": "object",
+                                        "required": ["path"],
+                                        "properties": {
+                                            "path": { "type": "string", "description": "Chemin absolu ou relatif du fichier à lire" }
                                         }
                                     }
                                 }
