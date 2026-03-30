@@ -31,7 +31,7 @@ cargo run
 
 The server currently exposes the following tools to the LLM agent:
 
-- **`git_status`**: Runs `git status` to view repository modifications.
+- **git repository tools**: Runs `git status`, `git add` or `git commit` to make repository modifications.
 - **`read_file`**: Reads and returns the content of a file (absolute or relative path).
 - **`replace_text_in_file`**: Searches for an exact block of text in a file and replaces it. Useful for modifying or removing code snippets without rewriting the entire file.
 - **`run_command`**: Executes a PowerShell command in a terminal (e.g., `ls`, `dir`).

@@ -56,6 +56,56 @@ fn handle_tool_call(params: Value, require_confirmation: bool) -> Value {
     }
 
     match name {
+        "git_add" => {
+            let custom_path = args.and_then(|a| a.get("path")).and_then(|p| p.as_str())
+                               .unwrap_or("C:\\Users\\ferta\\Documents\\GitHub\\MCP-server");
+            let files = args.and_then(|a| a.get("files")).and_then(|p| p.as_str()).unwrap_or(".");
+            
+            let output = Command::new("git")
+                .arg("add")
+                .arg(files)
+                .current_dir(custom_path)
+                .output();
+            
+            match output {
+                Ok(out) => {
+                    let mut result_str = String::from_utf8_lossy(&out.stdout).to_string();
+                    let stderr_str = String::from_utf8_lossy(&out.stderr).to_string();
+                    if !stderr_str.is_empty() {
+                        result_str = format!("{}\nErreur/Warn:\n{}", result_str, stderr_str);
+                    }
+                    if result_str.trim().is_empty() {
+                        result_str = format!("Fichier(s) {} ajouté(s).", files);
+                    }
+                    json!({ "content": [{ "type": "text", "text": result_str }] })
+                }
+                Err(e) => json!({ "isError": true, "content": [{ "type": "text", "text": format!("Erreur git add : {}", e) }] })
+            }
+        }
+        "git_commit" => {
+            let custom_path = args.and_then(|a| a.get("path")).and_then(|p| p.as_str())
+                               .unwrap_or("C:\\Users\\ferta\\Documents\\GitHub\\MCP-server");
+            let message = args.and_then(|a| a.get("message")).and_then(|p| p.as_str()).unwrap_or("Update");
+            
+            let output = Command::new("git")
+                .arg("commit")
+                .arg("-m")
+                .arg(message)
+                .current_dir(custom_path)
+                .output();
+                
+            match output {
+                Ok(out) => {
+                    let mut result_str = String::from_utf8_lossy(&out.stdout).to_string();
+                    let stderr_str = String::from_utf8_lossy(&out.stderr).to_string();
+                    if !stderr_str.is_empty() {
+                        result_str = format!("{}\nErreur/Warn:\n{}", result_str, stderr_str);
+                    }
+                    json!({ "content": [{ "type": "text", "text": result_str }] })
+                }
+                Err(e) => json!({ "isError": true, "content": [{ "type": "text", "text": format!("Erreur git commit : {}", e) }] })
+            }
+        }
         "git_status" => {
             let custom_path = args.and_then(|a| a.get("path")).and_then(|p| p.as_str())
                                .unwrap_or("C:\\Users\\ferta\\Documents\\GitHub\\MCP-server");
@@ -201,6 +251,30 @@ fn main() -> anyhow::Result<()> {
                                     "name": "git_status",
                                     "description": "Lance 'git status' pour voir les modifications.",
                                     "inputSchema": { "type": "object", "properties": {} }
+                                },
+                                {
+                                    "name": "git_add",
+                                    "description": "Ajoute des fichiers à l'index Git (git add).",
+                                    "inputSchema": {
+                                        "type": "object",
+                                        "required": ["files"],
+                                        "properties": {
+                                            "path": { "type": "string", "description": "Chemin du dépôt (optionnel)" },
+                                            "files": { "type": "string", "description": "Fichiers à ajouter (ex: '.', 'src/main.rs')" }
+                                        }
+                                    }
+                                },
+                                {
+                                    "name": "git_commit",
+                                    "description": "Crée un commit avec les modifications indexées (git commit -m).",
+                                    "inputSchema": {
+                                        "type": "object",
+                                        "required": ["message"],
+                                        "properties": {
+                                            "path": { "type": "string", "description": "Chemin du dépôt (optionnel)" },
+                                            "message": { "type": "string", "description": "Message du commit" }
+                                        }
+                                    }
                                 },
                                 {
                                     "name": "update_file",
