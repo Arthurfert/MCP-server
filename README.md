@@ -1,10 +1,10 @@
 # MCP Server
 
-A Model Context Protocol (MCP) server implemented in Rust.
+A Model Context Protocol (MCP) server collection, implemented in Rust.
 
 ## Description
 
-This project implements an MCP server that allows you to expose tools, resources, or other standardized features via the MCP protocol.
+This project implements a MCP server collection that allows you to expose tools, resources, or other standardized features via the MCP protocol.
 
 ## Prerequisites
 
@@ -36,6 +36,8 @@ The server currently exposes the following tools to the LLM agent:
 - **`replace_text_in_file`**: Searches for an exact block of text in a file and replaces it. Useful for modifying or removing code snippets without rewriting the entire file.
 - **`run_command`**: Executes a PowerShell command in a terminal (e.g., `ls`, `dir`).
 - **`update_file`**: Completely writes or overwrites an existing file with new content.
+
+And a lot more [incoming](Todo.md) !
 
 ## Parameters
 
