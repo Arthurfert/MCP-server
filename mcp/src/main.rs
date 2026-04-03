@@ -65,6 +65,10 @@ fn handle_tool_call(params: Value, require_confirmation: bool) -> Value {
         "replace_text_in_file" => tools::file::handle_replace_text_in_file(args),
         "rename_file" => tools::file::handle_rename_file(args),
         "run_command" => tools::cmd::handle_run_command(args),
+        "obsidian_create" => tools::obsidian::handle_obsidian_create(args),
+        "obsidian_append" => tools::obsidian::handle_obsidian_append(args),
+        "obsidian_read" => tools::obsidian::handle_obsidian_read(args),
+        "obsidian_search" => tools::obsidian::handle_obsidian_search(args),
         _ => json!({ "isError": true, "content": [{ "type": "text", "text": "Outil inconnu" }] })
     }
 }
@@ -188,6 +192,59 @@ fn main() -> anyhow::Result<()> {
                                         "properties": {
                                             "command": { "type": "string", "description": "La commande à exécuter" },
                                             "cwd": { "type": "string", "description": "Le dossier cible depuis lequel lancer la commande" }
+                                        }
+                                    }
+                                },
+                                {
+                                    "name": "obsidian_create",
+                                    "description": "Créer une nouvelle note Obsidian.",
+                                    "inputSchema": {
+                                        "type": "object",
+                                        "properties": {
+                                            "name": { "type": "string", "description": "Nom du fichier (ex: 'Nouvelle Note')" },
+                                            "path": { "type": "string", "description": "Chemin du fichier (ex: 'Dossier/Nouvelle Note.md')" },
+                                            "content": { "type": "string", "description": "Le contenu de la note" },
+                                            "vault": { "type": "string", "description": "Le nom du vault cible (optionnel)" },
+                                            "overwrite": { "type": "boolean", "description": "Écraser si le fichier existe" }
+                                        }
+                                    }
+                                },
+                                {
+                                    "name": "obsidian_append",
+                                    "description": "Ajouter du contenu à la fin d'une note Obsidian.",
+                                    "inputSchema": {
+                                        "type": "object",
+                                        "required": ["content"],
+                                        "properties": {
+                                            "file": { "type": "string", "description": "Nom du fichier" },
+                                            "path": { "type": "string", "description": "Chemin du fichier" },
+                                            "content": { "type": "string", "description": "Le contenu à ajouter" },
+                                            "vault": { "type": "string", "description": "Le nom du vault cible (optionnel)" }
+                                        }
+                                    }
+                                },
+                                {
+                                    "name": "obsidian_read",
+                                    "description": "Lire le contenu d'une note Obsidian.",
+                                    "inputSchema": {
+                                        "type": "object",
+                                        "properties": {
+                                            "file": { "type": "string", "description": "Nom du fichier" },
+                                            "path": { "type": "string", "description": "Chemin du fichier" },
+                                            "vault": { "type": "string", "description": "Le nom du vault cible (optionnel)" }
+                                        }
+                                    }
+                                },
+                                {
+                                    "name": "obsidian_search",
+                                    "description": "Chercher du texte dans le vault Obsidian.",
+                                    "inputSchema": {
+                                        "type": "object",
+                                        "required": ["query"],
+                                        "properties": {
+                                            "query": { "type": "string", "description": "Le texte à rechercher" },
+                                            "vault": { "type": "string", "description": "Le nom du vault cible (optionnel)" },
+                                            "format": { "enum": ["text", "json"], "description": "Le format de sortie (text ou json)" }
                                         }
                                     }
                                 }
