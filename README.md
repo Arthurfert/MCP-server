@@ -54,8 +54,20 @@ MCP-server/
     ├── Cargo.toml
     ├── Makefile
     └── src/
-        └── main.rs
+        ├── main.rs       (Point d'entrée, configuration et routing)
+        └── tools/        (Outils organisés par groupes logiques)
+            ├── mod.rs    (Déclaration des modules)
+            ├── cmd.rs    (Outils liés au terminal/commandes)
+            ├── file.rs   (Outils liés au système de fichiers)
+            └── git.rs    (Outils liés à Git)
 ```
+
+### Adding a new tool
+
+1. Create a new module file in `mcp/src/tools/` (e.g. `docker.rs` or add to an existing module).
+2. Declare the new module in `mcp/src/tools/mod.rs` (e.g., `pub mod docker;`).
+3. Add the tool's JSON schema description in the `tools/list` response matching in `main.rs`.
+4. Route the tool call in the `tools/call` match block inside `main.rs`.
 
 ## Development
 

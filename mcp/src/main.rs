@@ -1,7 +1,8 @@
 use serde::Deserialize;
 use serde_json::{json, Value};
 use std::io::{self, BufRead, Write};
-use std::process::Command;
+
+mod tools;
 
 #[derive(Deserialize, Debug)]
 #[allow(dead_code)]
@@ -56,160 +57,13 @@ fn handle_tool_call(params: Value, require_confirmation: bool) -> Value {
     }
 
     match name {
-        "git_add" => {
-            let custom_path = args.and_then(|a| a.get("path")).and_then(|p| p.as_str())
-                               .unwrap_or("C:\\Users\\ferta\\Documents\\GitHub\\MCP-server");
-            let files = args.and_then(|a| a.get("files")).and_then(|p| p.as_str()).unwrap_or(".");
-            
-            let output = Command::new("git")
-                .arg("add")
-                .arg(files)
-                .current_dir(custom_path)
-                .output();
-            
-            match output {
-                Ok(out) => {
-                    let mut result_str = String::from_utf8_lossy(&out.stdout).to_string();
-                    let stderr_str = String::from_utf8_lossy(&out.stderr).to_string();
-                    if !stderr_str.is_empty() {
-                        result_str = format!("{}\nErreur/Warn:\n{}", result_str, stderr_str);
-                    }
-                    if result_str.trim().is_empty() {
-                        result_str = format!("Fichier(s) {} ajouté(s).", files);
-                    }
-                    json!({ "content": [{ "type": "text", "text": result_str }] })
-                }
-                Err(e) => json!({ "isError": true, "content": [{ "type": "text", "text": format!("Erreur git add : {}", e) }] })
-            }
-        }
-        "git_commit" => {
-            let custom_path = args.and_then(|a| a.get("path")).and_then(|p| p.as_str())
-                               .unwrap_or("C:\\Users\\ferta\\Documents\\GitHub\\MCP-server");
-            let message = args.and_then(|a| a.get("message")).and_then(|p| p.as_str()).unwrap_or("Update");
-            
-            let output = Command::new("git")
-                .arg("commit")
-                .arg("-m")
-                .arg(message)
-                .current_dir(custom_path)
-                .output();
-                
-            match output {
-                Ok(out) => {
-                    let mut result_str = String::from_utf8_lossy(&out.stdout).to_string();
-                    let stderr_str = String::from_utf8_lossy(&out.stderr).to_string();
-                    if !stderr_str.is_empty() {
-                        result_str = format!("{}\nErreur/Warn:\n{}", result_str, stderr_str);
-                    }
-                    json!({ "content": [{ "type": "text", "text": result_str }] })
-                }
-                Err(e) => json!({ "isError": true, "content": [{ "type": "text", "text": format!("Erreur git commit : {}", e) }] })
-            }
-        }
-        "git_status" => {
-            let custom_path = args.and_then(|a| a.get("path")).and_then(|p| p.as_str())
-                               .unwrap_or("C:\\Users\\ferta\\Documents\\GitHub\\MCP-server");
-            
-            let mut cmd = Command::new("git");
-            cmd.arg("status").current_dir(custom_path);
-            
-            let output = cmd.output().unwrap();
-            let mut result_str = String::from_utf8_lossy(&output.stdout).to_string();
-            let stderr_str = String::from_utf8_lossy(&output.stderr).to_string();
-            let info = format!("Dossier courant d'exécution: {}", custom_path);
-            
-            if !stderr_str.is_empty() {
-                result_str = format!("{}\n{}\nErreur Git:\n{}", info, result_str, stderr_str);
-            } else {
-                result_str = format!("{}\n----\n{}", info, result_str);
-            }
-            if result_str.trim().is_empty() {
-                result_str = "(Sortie vide)".to_string();
-            }
-            json!({ "content": [{ "type": "text", "text": result_str }] })
-        }
-        "update_file" => {
-            if let Some(a) = args {
-                let path = a.get("path").and_then(|p| p.as_str()).unwrap_or("");
-                let content = a.get("content").and_then(|c| c.as_str()).unwrap_or("");
-                if let Err(e) = std::fs::write(path, content) {
-                     json!({ "isError": true, "content": [{ "type": "text", "text": format!("Erreur d'écriture : {}", e) }] })
-                } else {
-                     json!({ "content": [{ "type": "text", "text": format!("Fichier {} modifié en entier.", path) }] })
-                }
-            } else {
-                json!({ "isError": true, "content": [{ "type": "text", "text": "Arguments manquants" }] })
-            }
-        }
-        "read_file" => {
-            if let Some(a) = args {
-                let path = a.get("path").and_then(|p| p.as_str()).unwrap_or("");
-                match std::fs::read_to_string(path) {
-                    Ok(content) => json!({ "content": [{ "type": "text", "text": content }] }),
-                    Err(e) => json!({ "isError": true, "content": [{ "type": "text", "text": format!("Erreur de lecture du fichier {} : {}", path, e) }] })
-                }
-            } else {
-                json!({ "isError": true, "content": [{ "type": "text", "text": "Arguments manquants" }] })
-            }
-        }
-        "replace_text_in_file" => {
-            if let Some(a) = args {
-                let path = a.get("path").and_then(|p| p.as_str()).unwrap_or("");
-                let old_text = a.get("old_text").and_then(|t| t.as_str()).unwrap_or("");
-                let new_text = a.get("new_text").and_then(|t| t.as_str()).unwrap_or("");
-
-                match std::fs::read_to_string(path) {
-                    Ok(content) => {
-                        if content.contains(old_text) {
-                            let new_content = content.replace(old_text, new_text);
-                            if let Err(e) = std::fs::write(path, new_content) {
-                                json!({ "isError": true, "content": [{ "type": "text", "text": format!("Erreur d'écriture : {}", e) }] })
-                            } else {
-                                json!({ "content": [{ "type": "text", "text": format!("Texte remplacé avec succès dans le fichier {}.", path) }] })
-                            }
-                        } else {
-                            json!({ "isError": true, "content": [{ "type": "text", "text": "Le texte spécifié (old_text) n'a pas été trouvé dans le fichier, impossible de le remplacer." }] })
-                        }
-                    },
-                    Err(e) => json!({ "isError": true, "content": [{ "type": "text", "text": format!("Erreur de lecture du fichier {} : {}", path, e) }] })
-                }
-            } else {
-                json!({ "isError": true, "content": [{ "type": "text", "text": "Arguments manquants" }] })
-            }
-        }
-        "run_command" => {
-            if let Some(a) = args {
-                let cmd_str = a.get("command").and_then(|c| c.as_str()).unwrap_or("");
-                let cwd = a.get("cwd").and_then(|c| c.as_str()).unwrap_or("C:\\Users\\ferta\\Documents\\GitHub\\MCP-server");
-
-                let mut cmd = Command::new("powershell");
-                cmd.arg("-Command").arg(cmd_str).current_dir(cwd);
-
-                match cmd.output() {
-                    Ok(output) => {
-                        let mut result_str = String::from_utf8_lossy(&output.stdout).to_string();
-                        let stderr_str = String::from_utf8_lossy(&output.stderr).to_string();
-
-                        let info = format!("Dossier: {}\nCommande: {}", cwd, cmd_str);
-
-                        if !stderr_str.is_empty() {
-                            result_str = format!("{}\n{}\nErreur/Warn:\n{}", info, result_str, stderr_str);
-                        } else {
-                            result_str = format!("{}\n----\n{}", info, result_str);
-                        }
-                        if result_str.trim().is_empty() {
-                            result_str = "(Sortie vide)".to_string();
-                        }
-                        json!({ "content": [{ "type": "text", "text": result_str }] })
-                    },
-                    Err(e) => {
-                        json!({ "isError": true, "content": [{ "type": "text", "text": format!("Erreur d'exécution: {}", e) }] })
-                    }
-                }
-            } else {
-                json!({ "isError": true, "content": [{ "type": "text", "text": "Arguments manquants" }] })
-            }
-        }
+        "git_add" => tools::git::handle_git_add(args),
+        "git_commit" => tools::git::handle_git_commit(args),
+        "git_status" => tools::git::handle_git_status(args),
+        "update_file" => tools::file::handle_update_file(args),
+        "read_file" => tools::file::handle_read_file(args),
+        "replace_text_in_file" => tools::file::handle_replace_text_in_file(args),
+        "run_command" => tools::cmd::handle_run_command(args),
         _ => json!({ "isError": true, "content": [{ "type": "text", "text": "Outil inconnu" }] })
     }
 }
