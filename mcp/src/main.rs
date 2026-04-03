@@ -60,9 +60,10 @@ fn handle_tool_call(params: Value, require_confirmation: bool) -> Value {
         "git_add" => tools::git::handle_git_add(args),
         "git_commit" => tools::git::handle_git_commit(args),
         "git_status" => tools::git::handle_git_status(args),
-        "update_file" => tools::file::handle_update_file(args),
+        "write_file" => tools::file::handle_write_file(args),
         "read_file" => tools::file::handle_read_file(args),
         "replace_text_in_file" => tools::file::handle_replace_text_in_file(args),
+        "rename_file" => tools::file::handle_rename_file(args),
         "run_command" => tools::cmd::handle_run_command(args),
         _ => json!({ "isError": true, "content": [{ "type": "text", "text": "Outil inconnu" }] })
     }
@@ -131,7 +132,7 @@ fn main() -> anyhow::Result<()> {
                                     }
                                 },
                                 {
-                                    "name": "update_file",
+                                    "name": "write_file",
                                     "description": "Écrit ou remplace ENTIÈREMENT le contenu d'un fichier existant.",
                                     "inputSchema": {
                                         "type": "object",
@@ -150,6 +151,18 @@ fn main() -> anyhow::Result<()> {
                                         "required": ["path"],
                                         "properties": {
                                             "path": { "type": "string", "description": "Chemin absolu ou relatif du fichier à lire" }
+                                        }
+                                    }
+                                },
+                                {
+                                    "name": "rename_file",
+                                    "description": "Renomme un fichier.",
+                                    "inputSchema": {
+                                        "type": "object",
+                                        "required": ["old_path", "new_path"],
+                                        "properties": {
+                                            "old_path": { "type": "string", "description": "L'ancien chemin du fichier" },
+                                            "new_path": { "type": "string", "description": "Le nouveau chemin du fichier" }
                                         }
                                     }
                                 },

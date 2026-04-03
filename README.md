@@ -35,7 +35,7 @@ The server currently exposes the following tools to the LLM agent:
 - **`read_file`**: Reads and returns the content of a file (absolute or relative path).
 - **`replace_text_in_file`**: Searches for an exact block of text in a file and replaces it. Useful for modifying or removing code snippets without rewriting the entire file.
 - **`run_command`**: Executes a PowerShell command in a terminal (e.g., `ls`, `dir`).
-- **`update_file`**: Completely writes or overwrites an existing file with new content.
+- **`write_file`**: Completely writes or overwrites an existing file with new content.
 
 And a lot more [incoming](Todo.md) !
 

@@ -12,7 +12,7 @@ pub fn handle_read_file(args: Option<&serde_json::Map<String, Value>>) -> Value 
     }
 }
 
-pub fn handle_update_file(args: Option<&serde_json::Map<String, Value>>) -> Value {
+pub fn handle_write_file(args: Option<&serde_json::Map<String, Value>>) -> Value {
     if let Some(a) = args {
         let path = a.get("path").and_then(|p| p.as_str()).unwrap_or("");
         let content = a.get("content").and_then(|c| c.as_str()).unwrap_or("");
@@ -46,6 +46,23 @@ pub fn handle_replace_text_in_file(args: Option<&serde_json::Map<String, Value>>
                 }
             },
             Err(e) => json!({ "isError": true, "content": [{ "type": "text", "text": format!("Erreur de lecture du fichier {} : {}", path, e) }] })
+        }
+    } else {
+        json!({ "isError": true, "content": [{ "type": "text", "text": "Arguments manquants" }] })
+    }
+}
+
+pub fn handle_rename_file(args: Option<&serde_json::Map<String, Value>>) -> Value {
+    if let Some(a) = args {
+        let old_path = a.get("old_path").and_then(|p| p.as_str()).unwrap_or("");
+        let new_path = a.get("new_path").and_then(|p| p.as_str()).unwrap_or("");
+
+        if old_path.is_empty() || new_path.is_empty() {
+             json!({ "isError": true, "content": [{ "type": "text", "text": "Les arguments 'old_path' et 'new_path' sont obligatoires." }] })
+        } else if let Err(e) = std::fs::rename(old_path, new_path) {
+             json!({ "isError": true, "content": [{ "type": "text", "text": format!("Erreur lors du renommage : {}", e) }] })
+        } else {
+             json!({ "content": [{ "type": "text", "text": format!("Fichier '{}' renommé en '{}' avec succès.", old_path, new_path) }] })
         }
     } else {
         json!({ "isError": true, "content": [{ "type": "text", "text": "Arguments manquants" }] })
