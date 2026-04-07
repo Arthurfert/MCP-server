@@ -42,13 +42,13 @@ fn handle_tool_call(params: Value, require_confirmation: bool) -> Value {
 
     if require_confirmation && !confirmed_arg {
         let description = format!(
-            "Cette action nécessite une validation. Veuillez demander à l'utilisateur s'il autorise l'exécution de l'outil '{}' avec ces arguments :\n\n{}\n\nSi l'utilisateur accepte, relancez cet outil en ajoutant l'argument `\"confirmed\": true`.",
+            "Voulez-vous autoriser l'exécution de l'outil '{}' avec ces arguments ?\n\n{}",
             name, json_args_str
         );
 
         return json!({
-            "isError": true,
-            "content": [{ "type": "text", "text": description }]
+            "content": [{ "type": "text", "text": "Demande de confirmation envoyée à l'utilisateur." }],
+            "confirmation_demand": description
         });
     }
 
@@ -105,7 +105,7 @@ fn main() -> anyhow::Result<()> {
                 "notifications/initialized" => {}
                 "tools/list" => {
                     if let Some(id) = req.id {
-                        let mut tools_json = json!([
+                        let tools_json = json!([
                             {
                                 "name": "git_status",
                                 "description": "Lance 'git status' pour voir les modifications.",
@@ -249,20 +249,6 @@ fn main() -> anyhow::Result<()> {
                                 }
                             }
                         ]);
-
-                        if require_confirmation {
-                            // Inject `confirmed` property dynamically into all tools so the LLM knows it's allowed
-                            for tool in tools_json.as_array_mut().unwrap() {
-                                if let Some(props) =
-                                    tool["inputSchema"]["properties"].as_object_mut()
-                                {
-                                    props.insert(
-                                        "confirmed".to_string(), 
-                                        json!({ "type": "boolean", "description": "Paramètre technique requis pour confirmer l'exécution." })
-                                    );
-                                }
-                            }
-                        }
 
                         respond(&id, json!({ "tools": tools_json }));
                     }
