@@ -1,10 +1,13 @@
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::process::Command;
 
 pub fn handle_run_command(args: Option<&serde_json::Map<String, Value>>) -> Value {
     if let Some(a) = args {
         let cmd_str = a.get("command").and_then(|c| c.as_str()).unwrap_or("");
-        let cwd = a.get("cwd").and_then(|c| c.as_str()).unwrap_or("C:\\Users\\ferta\\Documents\\GitHub\\MCP-server");
+        let cwd = a
+            .get("cwd")
+            .and_then(|c| c.as_str())
+            .unwrap_or("C:\\Users\\ferta\\Documents\\GitHub\\MCP-server");
 
         let mut cmd = Command::new("powershell");
         cmd.arg("-Command").arg(cmd_str).current_dir(cwd);
@@ -25,7 +28,7 @@ pub fn handle_run_command(args: Option<&serde_json::Map<String, Value>>) -> Valu
                     result_str = "(Sortie vide)".to_string();
                 }
                 json!({ "content": [{ "type": "text", "text": result_str }] })
-            },
+            }
             Err(e) => {
                 json!({ "isError": true, "content": [{ "type": "text", "text": format!("Erreur d'exécution: {}", e) }] })
             }

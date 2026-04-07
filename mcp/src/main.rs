@@ -1,5 +1,5 @@
 use serde::Deserialize;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::io::{self, BufRead, Write};
 
 mod tools;
@@ -35,25 +35,21 @@ fn handle_tool_call(params: Value, require_confirmation: bool) -> Value {
         None => "Aucun argument".to_string(),
     };
 
-    if require_confirmation {
+    let confirmed_arg = args
+        .and_then(|a| a.get("confirmed"))
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
+
+    if require_confirmation && !confirmed_arg {
         let description = format!(
-            "L'IA souhaite exécuter l'outil : '{}'\n\nArguments :\n{}",
+            "Cette action nécessite une validation. Veuillez demander à l'utilisateur s'il autorise l'exécution de l'outil '{}' avec ces arguments :\n\n{}\n\nSi l'utilisateur accepte, relancez cet outil en ajoutant l'argument `\"confirmed\": true`.",
             name, json_args_str
         );
 
-        let confirmed = rfd::MessageDialog::new()
-            .set_level(rfd::MessageLevel::Warning)
-            .set_title("Exécution d'une commande système")
-            .set_description(&description)
-            .set_buttons(rfd::MessageButtons::YesNo)
-            .show();
-
-        if confirmed != rfd::MessageDialogResult::Yes {
-            return json!({
-                "isError": true,
-                "content": [{ "type": "text", "text": "Action annulée par l'utilisateur." }]
-            });
-        }
+        return json!({
+            "isError": true,
+            "content": [{ "type": "text", "text": description }]
+        });
     }
 
     match name {
@@ -69,7 +65,7 @@ fn handle_tool_call(params: Value, require_confirmation: bool) -> Value {
         "obsidian_append" => tools::obsidian::handle_obsidian_append(args),
         "obsidian_read" => tools::obsidian::handle_obsidian_read(args),
         "obsidian_search" => tools::obsidian::handle_obsidian_search(args),
-        _ => json!({ "isError": true, "content": [{ "type": "text", "text": "Outil inconnu" }] })
+        _ => json!({ "isError": true, "content": [{ "type": "text", "text": "Outil inconnu" }] }),
     }
 }
 
@@ -78,178 +74,197 @@ fn main() -> anyhow::Result<()> {
     let require_confirmation = !args.contains(&"--auto-approve".to_string());
 
     let stdin = io::stdin();
-    
+
     for line in stdin.lock().lines() {
         let line = match line {
             Ok(l) => l,
             Err(_) => break,
         };
-        
-        if line.trim().is_empty() { continue; }
+
+        if line.trim().is_empty() {
+            continue;
+        }
 
         if let Ok(req) = serde_json::from_str::<Request>(&line) {
             match req.method.as_str() {
                 "initialize" => {
                     if let Some(id) = req.id {
-                        respond(&id, json!({
-                            "protocolVersion": "2024-11-05",
-                            "serverInfo": { "name": "local-rust-mcp", "version": "0.1.0" },
-                            "capabilities": {
-                                "tools": {},
-                                "resources": {}
-                            }
-                        }));
+                        respond(
+                            &id,
+                            json!({
+                                "protocolVersion": "2024-11-05",
+                                "serverInfo": { "name": "local-rust-mcp", "version": "0.1.0" },
+                                "capabilities": {
+                                    "tools": {},
+                                    "resources": {}
+                                }
+                            }),
+                        );
                     }
                 }
                 "notifications/initialized" => {}
                 "tools/list" => {
                     if let Some(id) = req.id {
-                        respond(&id, json!({
-                            "tools": [
-                                {
-                                    "name": "git_status",
-                                    "description": "Lance 'git status' pour voir les modifications.",
-                                    "inputSchema": { "type": "object", "properties": {} }
-                                },
-                                {
-                                    "name": "git_add",
-                                    "description": "Ajoute des fichiers à l'index Git (git add).",
-                                    "inputSchema": {
-                                        "type": "object",
-                                        "required": ["files"],
-                                        "properties": {
-                                            "path": { "type": "string", "description": "Chemin du dépôt (optionnel)" },
-                                            "files": { "type": "string", "description": "Fichiers à ajouter (ex: '.', 'src/main.rs')" }
-                                        }
-                                    }
-                                },
-                                {
-                                    "name": "git_commit",
-                                    "description": "Crée un commit avec les modifications indexées (git commit -m).",
-                                    "inputSchema": {
-                                        "type": "object",
-                                        "required": ["message"],
-                                        "properties": {
-                                            "path": { "type": "string", "description": "Chemin du dépôt (optionnel)" },
-                                            "message": { "type": "string", "description": "Message du commit" }
-                                        }
-                                    }
-                                },
-                                {
-                                    "name": "write_file",
-                                    "description": "Écrit ou remplace ENTIÈREMENT le contenu d'un fichier existant.",
-                                    "inputSchema": {
-                                        "type": "object",
-                                        "required": ["path", "content"],
-                                        "properties": {
-                                            "path": { "type": "string", "description": "Chemin du fichier" },
-                                            "content": { "type": "string", "description": "Nouveau contenu complet du fichier" }
-                                        }
-                                    }
-                                },
-                                {
-                                    "name": "read_file",
-                                    "description": "Lit le contenu d'un fichier et le renvoie.",
-                                    "inputSchema": {
-                                        "type": "object",
-                                        "required": ["path"],
-                                        "properties": {
-                                            "path": { "type": "string", "description": "Chemin absolu ou relatif du fichier à lire" }
-                                        }
-                                    }
-                                },
-                                {
-                                    "name": "rename_file",
-                                    "description": "Renomme un fichier.",
-                                    "inputSchema": {
-                                        "type": "object",
-                                        "required": ["old_path", "new_path"],
-                                        "properties": {
-                                            "old_path": { "type": "string", "description": "L'ancien chemin du fichier" },
-                                            "new_path": { "type": "string", "description": "Le nouveau chemin du fichier" }
-                                        }
-                                    }
-                                },
-                                {
-                                    "name": "replace_text_in_file",
-                                    "description": "Cherche un bloc de texte précis dans un fichier et le remplace par un nouveau. Très utile pour modifier ou supprimer une portion de code (si new_text est vide) sans réécrire tout le fichier.",
-                                    "inputSchema": {
-                                        "type": "object",
-                                        "required": ["path", "old_text", "new_text"],
-                                        "properties": {
-                                            "path": { "type": "string", "description": "Chemin du fichier" },
-                                            "old_text": { "type": "string", "description": "Le texte exact à remplacer" },
-                                            "new_text": { "type": "string", "description": "Le nouveau texte. Peut être vide '' pour une suppression." }
-                                        }
-                                    }
-                                },
-                                {
-                                    "name": "run_command",
-                                    "description": "Exécute une commande PowerShell dans un terminal (ex: ls, dir). Attention: la commande 'cd' ne sauvegarde pas son état pour l'appel suivant (utilisez l'argument 'cwd' pour définir le dossier).",
-                                    "inputSchema": {
-                                        "type": "object",
-                                        "required": ["command"],
-                                        "properties": {
-                                            "command": { "type": "string", "description": "La commande à exécuter" },
-                                            "cwd": { "type": "string", "description": "Le dossier cible depuis lequel lancer la commande" }
-                                        }
-                                    }
-                                },
-                                {
-                                    "name": "obsidian_create",
-                                    "description": "Créer une nouvelle note Obsidian.",
-                                    "inputSchema": {
-                                        "type": "object",
-                                        "properties": {
-                                            "name": { "type": "string", "description": "Nom du fichier (ex: 'Nouvelle Note')" },
-                                            "path": { "type": "string", "description": "Chemin du fichier (ex: 'Dossier/Nouvelle Note.md')" },
-                                            "content": { "type": "string", "description": "Le contenu de la note" },
-                                            "vault": { "type": "string", "description": "Le nom du vault cible (optionnel)" },
-                                            "overwrite": { "type": "boolean", "description": "Écraser si le fichier existe" }
-                                        }
-                                    }
-                                },
-                                {
-                                    "name": "obsidian_append",
-                                    "description": "Ajouter du contenu à la fin d'une note Obsidian.",
-                                    "inputSchema": {
-                                        "type": "object",
-                                        "required": ["content"],
-                                        "properties": {
-                                            "file": { "type": "string", "description": "Nom du fichier" },
-                                            "path": { "type": "string", "description": "Chemin du fichier" },
-                                            "content": { "type": "string", "description": "Le contenu à ajouter" },
-                                            "vault": { "type": "string", "description": "Le nom du vault cible (optionnel)" }
-                                        }
-                                    }
-                                },
-                                {
-                                    "name": "obsidian_read",
-                                    "description": "Lire le contenu d'une note Obsidian.",
-                                    "inputSchema": {
-                                        "type": "object",
-                                        "properties": {
-                                            "file": { "type": "string", "description": "Nom du fichier" },
-                                            "path": { "type": "string", "description": "Chemin du fichier" },
-                                            "vault": { "type": "string", "description": "Le nom du vault cible (optionnel)" }
-                                        }
-                                    }
-                                },
-                                {
-                                    "name": "obsidian_search",
-                                    "description": "Chercher du texte dans le vault Obsidian.",
-                                    "inputSchema": {
-                                        "type": "object",
-                                        "required": ["query"],
-                                        "properties": {
-                                            "query": { "type": "string", "description": "Le texte à rechercher" },
-                                            "vault": { "type": "string", "description": "Le nom du vault cible (optionnel)" },
-                                            "format": { "enum": ["text", "json"], "description": "Le format de sortie (text ou json)" }
-                                        }
+                        let mut tools_json = json!([
+                            {
+                                "name": "git_status",
+                                "description": "Lance 'git status' pour voir les modifications.",
+                                "inputSchema": { "type": "object", "properties": {} }
+                            },
+                            {
+                                "name": "git_add",
+                                "description": "Ajoute des fichiers à l'index Git (git add).",
+                                "inputSchema": {
+                                    "type": "object",
+                                    "required": ["files"],
+                                    "properties": {
+                                        "path": { "type": "string", "description": "Chemin du dépôt (optionnel)" },
+                                        "files": { "type": "string", "description": "Fichiers à ajouter (ex: '.', 'src/main.rs')" }
                                     }
                                 }
-                            ]
-                        }));
+                            },
+                            {
+                                "name": "git_commit",
+                                "description": "Crée un commit avec les modifications indexées (git commit -m).",
+                                "inputSchema": {
+                                    "type": "object",
+                                    "required": ["message"],
+                                    "properties": {
+                                        "path": { "type": "string", "description": "Chemin du dépôt (optionnel)" },
+                                        "message": { "type": "string", "description": "Message du commit" }
+                                    }
+                                }
+                            },
+                            {
+                                "name": "write_file",
+                                "description": "Écrit ou remplace ENTIÈREMENT le contenu d'un fichier existant.",
+                                "inputSchema": {
+                                    "type": "object",
+                                    "required": ["path", "content"],
+                                    "properties": {
+                                        "path": { "type": "string", "description": "Chemin du fichier" },
+                                        "content": { "type": "string", "description": "Nouveau contenu complet du fichier" }
+                                    }
+                                }
+                            },
+                            {
+                                "name": "read_file",
+                                "description": "Lit le contenu d'un fichier et le renvoie.",
+                                "inputSchema": {
+                                    "type": "object",
+                                    "required": ["path"],
+                                    "properties": {
+                                        "path": { "type": "string", "description": "Chemin absolu ou relatif du fichier à lire" }
+                                    }
+                                }
+                            },
+                            {
+                                "name": "rename_file",
+                                "description": "Renomme un fichier.",
+                                "inputSchema": {
+                                    "type": "object",
+                                    "required": ["old_path", "new_path"],
+                                    "properties": {
+                                        "old_path": { "type": "string", "description": "L'ancien chemin du fichier" },
+                                        "new_path": { "type": "string", "description": "Le nouveau chemin du fichier" }
+                                    }
+                                }
+                            },
+                            {
+                                "name": "replace_text_in_file",
+                                "description": "Cherche un bloc de texte précis dans un fichier et le remplace par un nouveau. Très utile pour modifier ou supprimer une portion de code (si new_text est vide) sans réécrire tout le fichier.",
+                                "inputSchema": {
+                                    "type": "object",
+                                    "required": ["path", "old_text", "new_text"],
+                                    "properties": {
+                                        "path": { "type": "string", "description": "Chemin du fichier" },
+                                        "old_text": { "type": "string", "description": "Le texte exact à remplacer" },
+                                        "new_text": { "type": "string", "description": "Le nouveau texte. Peut être vide '' pour une suppression." }
+                                    }
+                                }
+                            },
+                            {
+                                "name": "run_command",
+                                "description": "Exécute une commande PowerShell dans un terminal (ex: ls, dir). Attention: la commande 'cd' ne sauvegarde pas son état pour l'appel suivant (utilisez l'argument 'cwd' pour définir le dossier).",
+                                "inputSchema": {
+                                    "type": "object",
+                                    "required": ["command"],
+                                    "properties": {
+                                        "command": { "type": "string", "description": "La commande à exécuter" },
+                                        "cwd": { "type": "string", "description": "Le dossier cible depuis lequel lancer la commande" }
+                                    }
+                                }
+                            },
+                            {
+                                "name": "obsidian_create",
+                                "description": "Créer une nouvelle note Obsidian.",
+                                "inputSchema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "name": { "type": "string", "description": "Nom du fichier (ex: 'Nouvelle Note')" },
+                                        "path": { "type": "string", "description": "Chemin du fichier (ex: 'Dossier/Nouvelle Note.md')" },
+                                        "content": { "type": "string", "description": "Le contenu de la note" },
+                                        "vault": { "type": "string", "description": "Le nom du vault cible (optionnel)" },
+                                        "overwrite": { "type": "boolean", "description": "Écraser si le fichier existe" }
+                                    }
+                                }
+                            },
+                            {
+                                "name": "obsidian_append",
+                                "description": "Ajouter du contenu à la fin d'une note Obsidian.",
+                                "inputSchema": {
+                                    "type": "object",
+                                    "required": ["content"],
+                                    "properties": {
+                                        "file": { "type": "string", "description": "Nom du fichier" },
+                                        "path": { "type": "string", "description": "Chemin du fichier" },
+                                        "content": { "type": "string", "description": "Le contenu à ajouter" },
+                                        "vault": { "type": "string", "description": "Le nom du vault cible (optionnel)" }
+                                    }
+                                }
+                            },
+                            {
+                                "name": "obsidian_read",
+                                "description": "Lire le contenu d'une note Obsidian.",
+                                "inputSchema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "file": { "type": "string", "description": "Nom du fichier" },
+                                        "path": { "type": "string", "description": "Chemin du fichier" },
+                                        "vault": { "type": "string", "description": "Le nom du vault cible (optionnel)" }
+                                    }
+                                }
+                            },
+                            {
+                                "name": "obsidian_search",
+                                "description": "Chercher du texte dans le vault Obsidian.",
+                                "inputSchema": {
+                                    "type": "object",
+                                    "required": ["query"],
+                                    "properties": {
+                                        "query": { "type": "string", "description": "Le texte à rechercher" },
+                                        "vault": { "type": "string", "description": "Le nom du vault cible (optionnel)" },
+                                        "format": { "enum": ["text", "json"], "description": "Le format de sortie (text ou json)" }
+                                    }
+                                }
+                            }
+                        ]);
+
+                        if require_confirmation {
+                            // Inject `confirmed` property dynamically into all tools so the LLM knows it's allowed
+                            for tool in tools_json.as_array_mut().unwrap() {
+                                if let Some(props) =
+                                    tool["inputSchema"]["properties"].as_object_mut()
+                                {
+                                    props.insert(
+                                        "confirmed".to_string(), 
+                                        json!({ "type": "boolean", "description": "Paramètre technique requis pour confirmer l'exécution." })
+                                    );
+                                }
+                            }
+                        }
+
+                        respond(&id, json!({ "tools": tools_json }));
                     }
                 }
                 "tools/call" => {

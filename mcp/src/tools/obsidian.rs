@@ -1,4 +1,4 @@
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::process::Command;
 
 fn run_obsidian_cmd(args: Vec<String>) -> Value {
@@ -26,7 +26,7 @@ fn run_obsidian_cmd(args: Vec<String>) -> Value {
             }
 
             json!({ "content": [{ "type": "text", "text": result_str }] })
-        },
+        }
         Err(e) => {
             json!({ "isError": true, "content": [{ "type": "text", "text": format!("Erreur d'exécution de 'obsidian': {}", e) }] })
         }
@@ -36,7 +36,7 @@ fn run_obsidian_cmd(args: Vec<String>) -> Value {
 pub fn handle_obsidian_create(args: Option<&serde_json::Map<String, Value>>) -> Value {
     if let Some(a) = args {
         let mut cmd_args = vec!["create".to_string()];
-        
+
         if let Some(name) = a.get("name").and_then(|v| v.as_str()) {
             cmd_args.push(format!("name={}", name));
         } else if let Some(path) = a.get("path").and_then(|v| v.as_str()) {
@@ -50,17 +50,17 @@ pub fn handle_obsidian_create(args: Option<&serde_json::Map<String, Value>>) -> 
             let escaped_content = content.replace("\n", "\\n").replace("\t", "\\t");
             cmd_args.push(format!("content={}", escaped_content));
         }
-        
+
         if let Some(vault) = a.get("vault").and_then(|v| v.as_str()) {
             cmd_args.push(format!("vault={}", vault));
         }
-        
+
         if let Some(overwrite) = a.get("overwrite").and_then(|v| v.as_bool()) {
             if overwrite {
                 cmd_args.push("overwrite".to_string());
             }
         }
-        
+
         run_obsidian_cmd(cmd_args)
     } else {
         json!({ "isError": true, "content": [{ "type": "text", "text": "Arguments requis manquants" }] })
@@ -70,7 +70,7 @@ pub fn handle_obsidian_create(args: Option<&serde_json::Map<String, Value>>) -> 
 pub fn handle_obsidian_append(args: Option<&serde_json::Map<String, Value>>) -> Value {
     if let Some(a) = args {
         let mut cmd_args = vec!["append".to_string()];
-        
+
         if let Some(file) = a.get("file").and_then(|v| v.as_str()) {
             cmd_args.push(format!("file={}", file));
         } else if let Some(path) = a.get("path").and_then(|v| v.as_str()) {
@@ -85,11 +85,11 @@ pub fn handle_obsidian_append(args: Option<&serde_json::Map<String, Value>>) -> 
         } else {
             return json!({ "isError": true, "content": [{ "type": "text", "text": "Le paramètre 'content' est obligatoire." }] });
         }
-        
+
         if let Some(vault) = a.get("vault").and_then(|v| v.as_str()) {
             cmd_args.push(format!("vault={}", vault));
         }
-        
+
         run_obsidian_cmd(cmd_args)
     } else {
         json!({ "isError": true, "content": [{ "type": "text", "text": "Arguments requis manquants" }] })
@@ -99,7 +99,7 @@ pub fn handle_obsidian_append(args: Option<&serde_json::Map<String, Value>>) -> 
 pub fn handle_obsidian_read(args: Option<&serde_json::Map<String, Value>>) -> Value {
     if let Some(a) = args {
         let mut cmd_args = vec!["read".to_string()];
-        
+
         if let Some(file) = a.get("file").and_then(|v| v.as_str()) {
             cmd_args.push(format!("file={}", file));
         } else if let Some(path) = a.get("path").and_then(|v| v.as_str()) {
@@ -107,11 +107,11 @@ pub fn handle_obsidian_read(args: Option<&serde_json::Map<String, Value>>) -> Va
         } else {
             return json!({ "isError": true, "content": [{ "type": "text", "text": "Le paramètre 'file' ou 'path' est obligatoire." }] });
         }
-        
+
         if let Some(vault) = a.get("vault").and_then(|v| v.as_str()) {
             cmd_args.push(format!("vault={}", vault));
         }
-        
+
         run_obsidian_cmd(cmd_args)
     } else {
         json!({ "isError": true, "content": [{ "type": "text", "text": "Arguments requis manquants" }] })
@@ -121,21 +121,21 @@ pub fn handle_obsidian_read(args: Option<&serde_json::Map<String, Value>>) -> Va
 pub fn handle_obsidian_search(args: Option<&serde_json::Map<String, Value>>) -> Value {
     if let Some(a) = args {
         let mut cmd_args = vec!["search".to_string()];
-        
+
         if let Some(query) = a.get("query").and_then(|v| v.as_str()) {
             cmd_args.push(format!("query={}", query));
         } else {
             return json!({ "isError": true, "content": [{ "type": "text", "text": "Le paramètre 'query' est obligatoire." }] });
         }
-        
+
         if let Some(vault) = a.get("vault").and_then(|v| v.as_str()) {
             cmd_args.push(format!("vault={}", vault));
         }
-        
+
         if let Some(format) = a.get("format").and_then(|v| v.as_str()) {
             cmd_args.push(format!("format={}", format));
         }
-        
+
         run_obsidian_cmd(cmd_args)
     } else {
         json!({ "isError": true, "content": [{ "type": "text", "text": "Arguments requis manquants" }] })
