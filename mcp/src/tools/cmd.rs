@@ -4,10 +4,15 @@ use std::process::Command;
 pub fn handle_run_command(args: Option<&serde_json::Map<String, Value>>) -> Value {
     if let Some(a) = args {
         let cmd_str = a.get("command").and_then(|c| c.as_str()).unwrap_or("");
+        
+        let default_cwd = std::env::current_dir()
+            .map(|p| p.to_string_lossy().into_owned())
+            .unwrap_or_else(|_| String::from("."));
+            
         let cwd = a
             .get("cwd")
             .and_then(|c| c.as_str())
-            .unwrap_or("C:\\Users\\ferta\\Documents\\GitHub\\MCP-server");
+            .unwrap_or(&default_cwd);
 
         let mut cmd = Command::new("powershell");
         cmd.arg("-Command").arg(cmd_str).current_dir(cwd);

@@ -2,10 +2,15 @@ use serde_json::{Value, json};
 use std::process::Command;
 
 pub fn handle_git_add(args: Option<&serde_json::Map<String, Value>>) -> Value {
+    let default_cwd = std::env::current_dir()
+        .map(|p| p.to_string_lossy().into_owned())
+        .unwrap_or_else(|_| String::from("."));
+        
     let custom_path = args
         .and_then(|a| a.get("path"))
         .and_then(|p| p.as_str())
-        .unwrap_or("C:\\Users\\ferta\\Documents\\GitHub\\MCP-server");
+        .unwrap_or(&default_cwd);
+        
     let files = args
         .and_then(|a| a.get("files"))
         .and_then(|p| p.as_str())
@@ -36,10 +41,15 @@ pub fn handle_git_add(args: Option<&serde_json::Map<String, Value>>) -> Value {
 }
 
 pub fn handle_git_commit(args: Option<&serde_json::Map<String, Value>>) -> Value {
+    let default_cwd = std::env::current_dir()
+        .map(|p| p.to_string_lossy().into_owned())
+        .unwrap_or_else(|_| String::from("."));
+        
     let custom_path = args
         .and_then(|a| a.get("path"))
         .and_then(|p| p.as_str())
-        .unwrap_or("C:\\Users\\ferta\\Documents\\GitHub\\MCP-server");
+        .unwrap_or(&default_cwd);
+        
     let message = args
         .and_then(|a| a.get("message"))
         .and_then(|p| p.as_str())
@@ -68,10 +78,14 @@ pub fn handle_git_commit(args: Option<&serde_json::Map<String, Value>>) -> Value
 }
 
 pub fn handle_git_status(args: Option<&serde_json::Map<String, Value>>) -> Value {
+    let default_cwd = std::env::current_dir()
+        .map(|p| p.to_string_lossy().into_owned())
+        .unwrap_or_else(|_| String::from("."));
+        
     let custom_path = args
         .and_then(|a| a.get("path"))
         .and_then(|p| p.as_str())
-        .unwrap_or("C:\\Users\\ferta\\Documents\\GitHub\\MCP-server");
+        .unwrap_or(&default_cwd);
 
     let mut cmd = Command::new("git");
     cmd.arg("status").current_dir(custom_path);
