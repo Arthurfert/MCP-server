@@ -53,9 +53,6 @@ fn handle_tool_call(params: Value, require_confirmation: bool) -> Value {
     }
 
     match name {
-        "git_add" => tools::git::handle_git_add(args),
-        "git_commit" => tools::git::handle_git_commit(args),
-        "git_status" => tools::git::handle_git_status(args),
         "write_file" => tools::file::handle_write_file(args),
         "read_file" => tools::file::handle_read_file(args),
         "replace_text_in_file" => tools::file::handle_replace_text_in_file(args),
@@ -107,35 +104,6 @@ fn main() -> anyhow::Result<()> {
                     if let Some(id) = req.id {
                         let tools_json = json!([
                             {
-                                "name": "git_status",
-                                "description": "Lance 'git status' pour voir les modifications.",
-                                "inputSchema": { "type": "object", "properties": {} }
-                            },
-                            {
-                                "name": "git_add",
-                                "description": "Ajoute des fichiers à l'index Git (git add).",
-                                "inputSchema": {
-                                    "type": "object",
-                                    "required": ["files"],
-                                    "properties": {
-                                        "path": { "type": "string", "description": "Chemin du dépôt (optionnel)" },
-                                        "files": { "type": "string", "description": "Fichiers à ajouter (ex: '.', 'src/main.rs')" }
-                                    }
-                                }
-                            },
-                            {
-                                "name": "git_commit",
-                                "description": "Crée un commit avec les modifications indexées (git commit -m).",
-                                "inputSchema": {
-                                    "type": "object",
-                                    "required": ["message"],
-                                    "properties": {
-                                        "path": { "type": "string", "description": "Chemin du dépôt (optionnel)" },
-                                        "message": { "type": "string", "description": "Message du commit" }
-                                    }
-                                }
-                            },
-                            {
                                 "name": "write_file",
                                 "description": "Écrit ou remplace ENTIÈREMENT le contenu d'un fichier existant.",
                                 "inputSchema": {
@@ -185,7 +153,7 @@ fn main() -> anyhow::Result<()> {
                             },
                             {
                                 "name": "run_command",
-                                "description": "Exécute une commande PowerShell dans un terminal (ex: ls, dir). Attention: la commande 'cd' ne sauvegarde pas son état pour l'appel suivant (utilisez l'argument 'cwd' pour définir le dossier).",
+                                "description": "Exécute n'importe quelle commande dans un terminal. Attention: la commande `cd` ne sauvegarde pas son état pour l'appel suivant (utilisez l'argument `cwd` pour définir le dossier).",
                                 "inputSchema": {
                                     "type": "object",
                                     "required": ["command"],
